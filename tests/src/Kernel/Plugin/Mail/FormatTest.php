@@ -68,7 +68,7 @@ class FormatTest extends KernelTestBase {
 
     $message['params']['content_type'] = SWIFTMAILER_FORMAT_PLAIN;
     $actual = $this->plugin->format($message);
-    $expected_plain = implode(PHP_EOL, $expected_plain);
+    $expected_plain = implode(PHP_EOL, $expected_plain) . PHP_EOL;
     $this->assertSame($expected_plain, (string) $actual['body']);
   }
 
@@ -103,8 +103,8 @@ class FormatTest extends KernelTestBase {
           "<p>consetetur &lt; sadipscing elitr</p>",
         ],
         'expected_plain' => [
-          "Lorem ipsum & dolor sit amet\n\n",
-          "consetetur < sadipscing elitr\n\n",
+          "Lorem ipsum & dolor sit amet\n",
+          "consetetur < sadipscing elitr",
         ],
       ],
 
@@ -112,10 +112,17 @@ class FormatTest extends KernelTestBase {
         'message' => [
           'body' => [
             "Lorem ipsum & dolor sit amet\nconsetetur < sadipscing elitr",
+            "URL is http://example.com",
           ],
         ],
-        'expected' => ["<p>Lorem ipsum &amp; dolor sit amet<br>\nconsetetur &lt; sadipscing elitr</p>"],
-        'expected_plain' => ["Lorem ipsum & dolor sit amet\nconsetetur < sadipscing elitr"],
+        'expected' => [
+          "<p>Lorem ipsum &amp; dolor sit amet<br>\nconsetetur &lt; sadipscing elitr</p>",
+          '<p>URL is <a href="http://example.com">http://example.com</a></p>',
+        ],
+        'expected_plain' => [
+          "Lorem ipsum & dolor sit amet\nconsetetur < sadipscing elitr",
+          "URL is http://example.com",
+        ],
       ],
 
       'mixed' => [
@@ -126,21 +133,21 @@ class FormatTest extends KernelTestBase {
             // markup.  For example it could be a website lecturer explaining
             // to students about the <strong> tag.
             'Hello & <strong>World</strong>',
-            new FormattableMarkup('Hello &amp; World #@number', ['@number' => 2]),
-            Markup::create('Hello &amp; <strong>World</strong>'),
+            new FormattableMarkup('<p>Hello &amp; World #@number</p>', ['@number' => 2]),
+            Markup::create('<p>Hello &amp; <strong>World</strong></p>'),
           ],
         ],
         'expected' => [
-          "<p>Hello &amp; World</p>\n",
-          "<p>Hello &amp; &lt;strong&gt;World&lt;/strong&gt;</p>\n",
-          "Hello &amp; World #2",
-          "Hello &amp; <strong>World</strong>",
+          "<p>Hello &amp; World</p>",
+          "<p>Hello &amp; &lt;strong&gt;World&lt;/strong&gt;</p>",
+          "<p>Hello &amp; World #2</p>",
+          "<p>Hello &amp; <strong>World</strong></p>",
         ],
         'expected_plain' => [
           "Hello & World",
-          "Hello & <strong>World</strong>",
+          "Hello & <strong>World</strong>\n",
           "Hello & World #2\n",
-          "Hello & *World*\n",
+          "Hello & WORLD",
         ],
       ],
     ];

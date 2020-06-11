@@ -10,7 +10,6 @@ use Drupal\Core\Asset\AssetResolverInterface;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Mail\MailFormatHelper;
 use Drupal\Core\Mail\MailInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\Markup;
@@ -156,52 +155,24 @@ class SwiftMailer implements MailInterface, ContainerFactoryPluginInterface {
    *   The message as it should be sent.
    */
   public function format(array $message) {
-    $message = $this->massageMessageBody($message);
-
     // Get content type.
-    $content_type = $this->getContentType($message);
+    $is_html = ($this->getContentType($message) == SWIFTMAILER_FORMAT_HTML);
 
-    // Theme message if format is set to be HTML.
-    if ($content_type == SWIFTMAILER_FORMAT_HTML) {
-      // Attempt to use the mail theme defined in MailSystem.
-      if ($this->mailManager instanceof MailsystemManager) {
-        $mail_theme = $this->mailManager->getMailTheme();
-      }
-      // Default to the active theme if MailsystemManager isn't used.
-      else {
-        $mail_theme = $this->themeManager->getActiveTheme()->getName();
-      }
-      $render = [
-        '#theme' => $message['params']['theme'] ?? 'swiftmailer',
-        '#message' => $message,
-        '#attached' => [
-          'library' => ["$mail_theme/swiftmailer"],
-        ],
-      ];
+    // Determine if a plain text alternative is required. The message parameter
+    // takes priority over config. Support the alternate parameter 'convert'
+    // for back-compatibility.
+    $generate_plain = $message['params']['generate_plain'] ?? $message['params']['convert'] ?? $this->config['message']['generate_plain'];
 
-      $message['body'] = $this->renderer->renderPlain($render);
-
-      // The message parameter takes priority over config. Support the
-      // alternate parameter 'convert' for back-compatibility.
-      $generate_plain = $message['params']['generate_plain'] ?? $message['params']['convert'] ?? $this->config['message']['generate_plain'];
-      if (empty($message['plain']) && $generate_plain) {
-        $converter = new Html2Text($message['body']);
-        $message['plain'] = $converter->getText();
-      }
-
-      // Process CSS from libraries.
-      $assets = AttachedAssets::createFromRenderArray($render);
-      $css = '';
-      // Request optimization so that the CssOptimizer performs essential
-      // processing such as @include.
-      foreach ($this->assetResolver->getCssAssets($assets, TRUE) as $css_asset) {
-        $css .= file_get_contents($css_asset['data']);
-      }
-
-      if ($css) {
-        $message['body'] = (new CssToInlineStyles())->convert($message['body'], $css);
-      }
+    if ($generate_plain && empty($message['plain']) && $is_html) {
+      // Generate plain text alternative. This must be done first with the
+      // original message body, before overwriting it with the HTML version.
+      $saved_body = $message['body'];
+      $this->massageMessageBody($message, FALSE);
+      $message['plain'] = $message['body'];
+      $message['body'] = $saved_body;
     }
+
+    $this->massageMessageBody($message, $is_html);
 
     // We replace all 'image:foo' in the body with a unique magic string like
     // 'cid:[randomname]' and keep track of this. It will be replaced by the
@@ -552,38 +523,77 @@ class SwiftMailer implements MailInterface, ContainerFactoryPluginInterface {
    *
    * @param array $message
    *   The message.
-   *
-   * @return array
-   *   The render array for message body.
+   * @param boolean $is_html
+   *   True if generating HTML output, false for plain text.
    *
    * @internal
    */
-  protected function massageMessageBody(array $message) {
-    $content_type = $this->getContentType($message);
+  protected function massageMessageBody(array &$message, $is_html) {
     $text_format = $message['params']['text_format'] ?? $this->config['message']['text_format'] ?: NULL;
+    $line_endings = Settings::get('mail_line_endings', PHP_EOL);
+    $body = [];
 
-    foreach ($message['body'] as &$body) {
-      $is_markup = ($body instanceof MarkupInterface);
-
-      if (!$is_markup && ($content_type == SWIFTMAILER_FORMAT_HTML)) {
-        // Convert to HTML.  The default 'plain_text' format escapes markup,
-        // converts new lines to <br> and converts URLs to links.
-        $body = check_markup($body, $text_format);
+    foreach ($message['body'] as $part) {
+      if (!($part instanceof MarkupInterface)) {
+        if ($is_html) {
+          // Convert to HTML. The default 'plain_text' format escapes markup,
+          // converts new lines to <br> and converts URLs to links.
+          $body[] = check_markup($part, $text_format);
+        }
+        else {
+          // The body will be plain text. However we need to convert to HTML
+          // to render the template then convert back again. Use a fixed
+          // conversion because we don't want to convert URLs to links.
+          $body[] = preg_replace("|\n|", "<br />\n", HTML::escape($part)) . "<br />\n";
+        }
       }
-
-      if ($is_markup && ($content_type == SWIFTMAILER_FORMAT_PLAIN)) {
-        // Convert to plain text.
-        $body = MailFormatHelper::htmlToText($body);
+      else {
+        $body[] = $part . $line_endings;
       }
     }
 
-    // Merge all lines in the e-mail body separated by the mail line endings.
-    // Treat the result as safe markup even for plain text format to prevent
-    // Twig auto-escape.
-    $line_endings = Settings::get('mail_line_endings', PHP_EOL);
-    $message['body'] = Markup::create(implode($line_endings, $message['body']));
+    // Merge all lines in the e-mail body and treat the result as safe markup.
+    $message['body'] = Markup::create(implode('', $body));
 
-    return $message;
+    // Attempt to use the mail theme defined in MailSystem.
+    if ($this->mailManager instanceof MailsystemManager) {
+      $mail_theme = $this->mailManager->getMailTheme();
+    }
+    // Default to the active theme if MailsystemManager isn't used.
+    else {
+      $mail_theme = $this->themeManager->getActiveTheme()->getName();
+    }
+
+    $render = [
+      '#theme' => $message['params']['theme'] ?? 'swiftmailer',
+      '#message' => $message,
+      '#is_html' => $is_html,
+    ];
+
+    if ($is_html) {
+      $render['#attached']['library'] = ["$mail_theme/swiftmailer"];
+    }
+
+    $message['body'] = $this->renderer->renderPlain($render);
+
+    if ($is_html) {
+      // Process CSS from libraries.
+      $assets = AttachedAssets::createFromRenderArray($render);
+      $css = '';
+      // Request optimization so that the CssOptimizer performs essential
+      // processing such as @include.
+      foreach ($this->assetResolver->getCssAssets($assets, TRUE) as $css_asset) {
+        $css .= file_get_contents($css_asset['data']);
+      }
+
+      if ($css) {
+        $message['body'] = (new CssToInlineStyles())->convert($message['body'], $css);
+      }
+    }
+    else {
+      // Convert to plain text.
+      $message['body'] = (new Html2Text($message['body']))->getText();
+    }
   }
 
 }

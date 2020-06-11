@@ -55,6 +55,7 @@ function swiftmailer_theme($existing, $type, $theme, $path) {
     'swiftmailer' => [
       'variables' => [
         'message' => [],
+        'is_html' => FALSE,
       ],
       'mail theme' => TRUE,
     ],
@@ -79,9 +80,7 @@ function swiftmailer_theme_suggestions_swiftmailer(array $variables) {
  * @param array $variables
  *   An associative array containing:
  *   - message: An associative array containing the message array.
- *   - body: The processed body.
- *   - subject: The processed subject.
- *   - base_url: The base url for this site including scheme, without trailing slash.
+ *   - is_html: True if generating HTML output, false for plain text.
  */
 function template_preprocess_swiftmailer(&$variables) {
   $variables['base_url'] = $GLOBALS['base_url'];

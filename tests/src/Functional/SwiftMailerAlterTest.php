@@ -76,7 +76,7 @@ class SwiftMailerAlterTest extends SwiftMailerTestBase {
 
     $message = $plugin->format($message);
     $this->assertContains('<strong>Hello World</strong>', (string) $message['body']);
-    $this->assertContains('HELLO WORLD', $message['plain']);
+    $this->assertEquals('HELLO WORLD', $message['plain']);
   }
 
   /**
@@ -103,7 +103,7 @@ class SwiftMailerAlterTest extends SwiftMailerTestBase {
 
     $message = $plugin->format($message);
     $this->assertContains('<strong>Hello World</strong>', (string) $message['body']);
-    $this->assertContains('Original Plain Text Version', $message['plain']);
+    $this->assertEquals('Original Plain Text Version', $message['plain']);
   }
 
   public function testPlainTextConfigurationSetting() {
@@ -126,7 +126,7 @@ class SwiftMailerAlterTest extends SwiftMailerTestBase {
 
     $message = $plugin->format($message);
     $this->assertContains('<strong>Hello World</strong>', (string) $message['body']);
-    $this->assertContains('HELLO WORLD', $message['plain']);
+    $this->assertEquals('HELLO WORLD', $message['plain']);
 
     // Keep original plain text version.
     $message = [
@@ -141,7 +141,7 @@ class SwiftMailerAlterTest extends SwiftMailerTestBase {
 
     $message = $plugin->format($message);
     $this->assertContains('<strong>Hello World</strong>', (string) $message['body']);
-    $this->assertContains('Original Plain Text Version', $message['plain']);
+    $this->assertEquals('Original Plain Text Version', $message['plain']);
   }
 
 }
