@@ -69,14 +69,12 @@ class RealMailTest extends SwiftMailerTestBase {
     // HTML.
     $this->drupalPostForm('contact/contact', $edit, 'Send message');
     $this->assertSubject('[Help & Support] Hello & greetings');
-    $this->assertBodyContains('#I am so happy <grin>#');
-    // @todo Should be $this->assertBodyContains('#I am so happy &lt;grin&gt;#');
+    $this->assertBodyContains('#I am so happy &lt;grin&gt;#');
 
     // Plain text.
     $this->enablePlain();
     $this->drupalPostForm('contact/contact', $edit, 'Send message');
-    $this->assertBodyContains('#I am so happy #');
-    // @todo Should be $this->assertBodyContains('#I am so happy <grin>#');
+    $this->assertBodyContains('#I am so happy <grin>#');
 
   }
 
