@@ -26,7 +26,8 @@ class RealMailTest extends SwiftMailerTestBase {
       ->set('password_reset.subject', 'You forgot <again>')
       ->set('password_reset.body', '#Your password for [site:name] is a&<b<#')
       ->save();
-    $this->drupalPostForm('user/password', ['name' => $account->getEmail()], 'Submit');
+    $this->drupalGet('user/password');
+    $this->submitForm(['name' => $account->getEmail()], 'Submit');
     $this->assertSubject('You forgot ');
     // @todo Should be $this->assertSubject('You forgot <again>');
     $this->assertBodyContains('#Your password for Rise &amp;amp; shine is a&amp;&lt;b&lt;#');
@@ -34,7 +35,8 @@ class RealMailTest extends SwiftMailerTestBase {
 
     // Plain text.
     $this->enablePlain();
-    $this->drupalPostForm('user/password', ['name' => $account->getEmail()], 'Submit');
+    $this->drupalGet('user/password');
+    $this->submitForm(['name' => $account->getEmail()], 'Submit');
     $this->assertBodyContains('#Your password for Rise &amp; shine is a&<b<#');
     // @todo Should be $this->assertBodyContains('#Your password for Rise & shine is a&<b<#');
 
@@ -59,7 +61,8 @@ class RealMailTest extends SwiftMailerTestBase {
       'selected' => TRUE,
     ];
     $this->drupalLogin($this->createUser(['administer contact forms', 'access site-wide contact form']));
-    $this->drupalPostForm('admin/structure/contact/add', $edit, 'Save');
+    $this->drupalGet('admin/structure/contact/add');
+    $this->submitForm($edit, 'Save');
 
     $edit = [
       'subject[0][value]' => 'Hello & greetings',
@@ -67,13 +70,15 @@ class RealMailTest extends SwiftMailerTestBase {
     ];
 
     // HTML.
-    $this->drupalPostForm('contact/contact', $edit, 'Send message');
+    $this->drupalGet('contact/contact');
+    $this->submitForm($edit, 'Send message');
     $this->assertSubject('[Help & Support] Hello & greetings');
     $this->assertBodyContains('#I am so happy &lt;grin&gt;#');
 
     // Plain text.
     $this->enablePlain();
-    $this->drupalPostForm('contact/contact', $edit, 'Send message');
+    $this->drupalGet('contact/contact');
+    $this->submitForm($edit, 'Send message');
     $this->assertBodyContains('#I am so happy <grin>#');
 
   }
