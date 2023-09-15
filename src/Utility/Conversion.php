@@ -218,7 +218,7 @@ class Conversion {
     // a line break within the header value.
     // See RFC 2047, the related RFCs.
     // @see https://www.drupal.org/project/drupal/issues/84883.
-    $value = str_replace(["\n", "\r"], '', $value);
+    $value = str_replace(["\n", "\r"], '', $value ?? '');
 
     if (preg_match('/' . static::SWIFTMAILER_MAILBOX_PATTERN . '/', $value)) {
       return TRUE;
@@ -378,7 +378,7 @@ class Conversion {
     // a line break within the header value.
     // See RFC 2047, the related RFCs.
     // @see https://www.drupal.org/project/drupal/issues/84883.
-    $value = str_replace(["\n", "\r"], '', $value);
+    $value = str_replace(["\n", "\r"], '', $value ?? '');
 
     // Split mailboxes by ',' (comma) and ';' (semicolon).
     $mailboxes_raw = [];
